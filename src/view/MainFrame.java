@@ -337,6 +337,7 @@ public class MainFrame {
 		String networkDiscoveryResult = NetworkDiscoverClient.surroundDiscoverIOException(networkName, actualServerPort, 3000);
 		if(networkDiscoveryResult != "NotFound") {
 			ipServerHostingPane.setText("Server ip: " + networkDiscoveryResult);
+			if(!serverIsOn) turnOnOffBtn.setEnabled(false);
 		}
 		else {
 			ipServerHostingPane.setText("Server is off");
@@ -404,7 +405,6 @@ public class MainFrame {
 							serverName.setText(serverNameString);
 							turnOnOffBtn.setText("Off");
 							serverIsOn = true;
-//							ShutdownBlocker.bloquear();
 							consoleArea = new JTextArea(15, 60);
 							JScrollPane scroll = new JScrollPane(consoleArea);
 							consoleArea.setEditable(false);
@@ -443,7 +443,6 @@ public class MainFrame {
 						serverIsOn = false;
 						turnOnOffBtn.setText("On");
 						responder.closeListeningSocket();
-//						ShutdownBlocker.desbloquear();
 						checkServerStatus();
 					});
 					
@@ -498,14 +497,9 @@ public class MainFrame {
 	        ForgeUtils.sendCommand("/stop", serverProcess, serverWriter);
 	        try { 
 	            serverProcess.waitFor();
-	            // Desbloquear después de guardar
-//	            ShutdownBlocker.desbloquear();
 	        } catch (InterruptedException e) {
 	            e.printStackTrace();
 	        }
-	    } else {
-	        // Si el servidor no está activo, asegurarse de desbloquear
-//	        ShutdownBlocker.desbloquear();
 	    }
 	    frame.dispose();
 	    System.exit(0);

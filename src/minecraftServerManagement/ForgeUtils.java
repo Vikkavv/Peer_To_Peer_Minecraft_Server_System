@@ -6,6 +6,7 @@ import java.io.BufferedWriter;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
@@ -375,7 +376,7 @@ public class ForgeUtils {
 				JOptionPane.showMessageDialog(null, "File not found or inaccessible", "Error", JOptionPane.ERROR_MESSAGE);
 			}
 		}
-		return 0;
+		return getSavedServerPort();
 	}
 	
 	public static void setServerPort(Path serverDirectory, int newPort) {
@@ -392,6 +393,34 @@ public class ForgeUtils {
 			catch (IOException e) {
 				JOptionPane.showMessageDialog(null, "File not found or inaccessible", "Error", JOptionPane.ERROR_MESSAGE);
 			}
+		}
+		setSavedServerPort(newPort);
+	}
+	
+	private static int getSavedServerPort() {
+		if(checkIfExistsNetworkNameFileAndCreateIfNot()) {
+			Properties props = new Properties();
+			File file = new File("data/networkName.properties");
+			try(FileInputStream in = new FileInputStream(file)){
+				props.load(in);
+				if(!(props.containsKey("server-port"))) props.setProperty("server-port", "25565");
+				return Integer.parseInt(props.getProperty("server-port"));
+			} 
+			catch(Exception e) {}
+		}
+		return 25565;
+	}
+	
+	private static void setSavedServerPort(int port) {
+		if(checkIfExistsNetworkNameFileAndCreateIfNot()) {
+			Properties props = new Properties();
+			File file = new File("data/networkName.properties");
+			try(FileInputStream in = new FileInputStream(file)){
+				props.load(in);
+				if(!(props.containsKey("server-port"))) props.setProperty("server-port", "25565");
+				props.setProperty("server-port", ""+port);
+			}
+			catch(Exception e) {}
 		}
 	}
 }
