@@ -495,6 +495,17 @@ public class MainFrame {
 		
 		turnOnOffBtn.addActionListener(trnOnOffBtn -> {
 			if(!serverIsOn) {
+				String networkDiscoveryResult = NetworkDiscoverClient.surroundDiscoverIOException(networkName, actualServerPort, 3000);
+				if(networkDiscoveryResult != "NotFound") {
+			        JOptionPane.showMessageDialog(
+			                null,                   
+			                "Server already opened by other host, if you really want to turn it on, change the networkName in configuration menu.",
+			                "Info",
+			                JOptionPane.INFORMATION_MESSAGE
+			        );
+			        turnOnOffBtn.setEnabled(false);
+					return;
+				}
 				String serverNameString = serverName.getText();
 				serverName.setText(serverNameString + " - Server is turning on...");
 				topContent.revalidate();
