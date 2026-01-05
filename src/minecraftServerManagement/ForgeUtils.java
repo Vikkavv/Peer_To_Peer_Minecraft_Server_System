@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
+import java.lang.management.ManagementFactory;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
@@ -35,6 +36,8 @@ import javax.xml.parsers.ParserConfigurationException;
 import org.w3c.dom.Document;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
+
+import com.sun.management.OperatingSystemMXBean;
 
 
 public class ForgeUtils {
@@ -79,7 +82,7 @@ public class ForgeUtils {
 			p = pb.start();
 			p.waitFor();
 		} catch (IOException e) {
-			JOptionPane.showMessageDialog(null, "File not found or inaccessible", "Error", JOptionPane.ERROR_MESSAGE);
+			JOptionPane.showMessageDialog(null, "File not found or inaccessible (instalation selected directory)", "Error", JOptionPane.ERROR_MESSAGE);
 		} catch (InterruptedException e) {
 			JOptionPane.showMessageDialog(null, "Process interrupted, try again", "Error", JOptionPane.ERROR_MESSAGE);
 		}
@@ -97,7 +100,7 @@ public class ForgeUtils {
 			try {
 				Files.createFile(eula);
 			} catch (IOException e) {
-				JOptionPane.showMessageDialog(null, "File not found or inaccessible", "Error", JOptionPane.ERROR_MESSAGE);
+				JOptionPane.showMessageDialog(null, "File not found or inaccessible (eula.txt)", "Error", JOptionPane.ERROR_MESSAGE);
 			}
 
 		try {
@@ -140,7 +143,7 @@ public class ForgeUtils {
 		} catch (SAXException e) {
 			JOptionPane.showMessageDialog(null, "XML metadata parser error", "Error", JOptionPane.ERROR_MESSAGE);
 		} catch (IOException e) {
-			JOptionPane.showMessageDialog(null, "File not found or inaccessible", "Error", JOptionPane.ERROR_MESSAGE);
+			JOptionPane.showMessageDialog(null, "File not found or inaccessible (forgeMetadata)", "Error", JOptionPane.ERROR_MESSAGE);
 		}
 		
 		if(document != null) {
@@ -193,14 +196,14 @@ public class ForgeUtils {
 			try {
 				Files.createDirectories(modsDirectory.toPath());
 			} catch (IOException e) {
-				JOptionPane.showMessageDialog(null, "File not found or inaccessible", "Error", JOptionPane.ERROR_MESSAGE);
+				JOptionPane.showMessageDialog(null, "Directory not found or inaccessible (mods folder)", "Error", JOptionPane.ERROR_MESSAGE);
 			}
 		}
 		else {
 			try {
 				Desktop.getDesktop().open(modsDirectory);
 			} catch (IOException e) {
-				JOptionPane.showMessageDialog(null, "File not found or inaccessible", "Error", JOptionPane.ERROR_MESSAGE);
+				JOptionPane.showMessageDialog(null, "Directory not found or inaccessible (mods folder)", "Error", JOptionPane.ERROR_MESSAGE);
 			}
 		}
 	}
@@ -300,6 +303,28 @@ public class ForgeUtils {
         return "-Xmx1G";
 	}
 	
+	public static void setServerRAMAlloc(Path serverDirectory, int gb) throws Exception {
+		String memoryUnit = "G";
+		//We get the free amount of RAM (in GB) in the system.
+		OperatingSystemMXBean os = (OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
+		long freeRamGB = (long) (os.getFreeMemorySize() / (Math.pow(1024L, 3)));
+		long totalRamGb = (long) (os.getTotalMemorySize() / (Math.pow(1024L, 3)));
+		
+		if(gb > totalRamGb) memoryUnit = "M";
+		if(gb > freeRamGB && memoryUnit == "G" || gb > freeRamGB * 1024L && memoryUnit == "M") throw new Exception("Ram exceeded");
+		
+		Path path = Path.of(serverDirectory + "/user_jvm_args.txt");
+		List<String> lines;
+		try {
+			lines = Files.readAllLines(path);
+			lines.set(lines.size() - 1, "-Xmx" + gb + memoryUnit);
+			Files.write(path, lines);
+		}
+		catch(IOException e) {
+			JOptionPane.showMessageDialog(null, "File not found or inaccessible (user_jvm_args.txt)", "Error", JOptionPane.ERROR_MESSAGE);
+		}
+	}
+	
 	public static String getServerJarName(Path serverDirectory) {
 		try (BufferedReader br = new BufferedReader(new FileReader(serverDirectory.toString() + "/run.bat"))) {
             String line;
@@ -320,7 +345,7 @@ public class ForgeUtils {
 				Files.createFile(Paths.get("data/networkName.properties"));
 				return false;
 			} catch (IOException e) {
-				JOptionPane.showMessageDialog(null, "File not found or inaccessible", "Error", JOptionPane.ERROR_MESSAGE);
+				JOptionPane.showMessageDialog(null, "File not found or inaccessible (networkName.properties)", "Error", JOptionPane.ERROR_MESSAGE);
 			}
 		}
 		return true;
@@ -359,7 +384,7 @@ public class ForgeUtils {
 		        out.close();
 			}
 			catch (IOException e) {
-				JOptionPane.showMessageDialog(null, "File not found or inaccessible", "Error", JOptionPane.ERROR_MESSAGE);
+				JOptionPane.showMessageDialog(null, "File not found or inaccessible (networkName.properties)", "Error", JOptionPane.ERROR_MESSAGE);
 			}
 		}
 	}
@@ -373,7 +398,7 @@ public class ForgeUtils {
 				return Integer.parseInt(props.getProperty("server-port"));
 			} 
 			catch (IOException e) {
-				JOptionPane.showMessageDialog(null, "File not found or inaccessible", "Error", JOptionPane.ERROR_MESSAGE);
+				JOptionPane.showMessageDialog(null, "File not found or inaccessible (server.properties)", "Error", JOptionPane.ERROR_MESSAGE);
 			}
 		}
 		return getSavedServerPort();
@@ -391,7 +416,7 @@ public class ForgeUtils {
 		        out.close();
 			} 
 			catch (IOException e) {
-				JOptionPane.showMessageDialog(null, "File not found or inaccessible", "Error", JOptionPane.ERROR_MESSAGE);
+				JOptionPane.showMessageDialog(null, "File not found or inaccessible (server.properties)", "Error", JOptionPane.ERROR_MESSAGE);
 			}
 		}
 		setSavedServerPort(newPort);
@@ -406,7 +431,9 @@ public class ForgeUtils {
 				if(!(props.containsKey("server-port"))) props.setProperty("server-port", "25565");
 				return Integer.parseInt(props.getProperty("server-port"));
 			} 
-			catch(Exception e) {}
+			catch(Exception e) {
+				JOptionPane.showMessageDialog(null, "File not found or inaccessible (networkName.properties)", "Error", JOptionPane.ERROR_MESSAGE);
+			}
 		}
 		return 25565;
 	}
@@ -420,7 +447,9 @@ public class ForgeUtils {
 				if(!(props.containsKey("server-port"))) props.setProperty("server-port", "25565");
 				props.setProperty("server-port", ""+port);
 			}
-			catch(Exception e) {}
+			catch(Exception e) {
+				JOptionPane.showMessageDialog(null, "File not found or inaccessible (networkName.properties)", "Error", JOptionPane.ERROR_MESSAGE);
+			}
 		}
 	}
 }
