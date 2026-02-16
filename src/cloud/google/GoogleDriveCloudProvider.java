@@ -426,7 +426,7 @@ public class GoogleDriveCloudProvider implements CloudStorageProvider{
 		String parentId = getOrCreateServerFolderIdWithMetadata("P2PMSS-Backups", metadata);
 		String backupFolderId = getOrCreateServerFolderId(MainFrame.getServerName(), parentId, metadataChildren, true, true);
 		
-		ZipUtils.createZip(MainFrame.serverOpenedDirectory.toPath(), ZipUtils.BACKUPS_ZIPS_FOLDER);
+		ZipUtils.createZip(MainFrame.getServerOpenedDirectory().toPath(), ZipUtils.BACKUPS_ZIPS_FOLDER);
 		uploadServerBackup(ZipUtils.BACKUPS_ZIPS_FOLDER);
 		
 		if(backupFolderId != null) {
@@ -436,7 +436,7 @@ public class GoogleDriveCloudProvider implements CloudStorageProvider{
 	                "Google Drive",
 	                JOptionPane.INFORMATION_MESSAGE
 	        );
-	        MainFrame.createServerBackupsFolderInCloud.setVisible(false);
+	        // Button visibility is now handled within each ServerTab
 		}
 	}
 	

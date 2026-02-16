@@ -9,19 +9,44 @@ import java.io.InputStreamReader;
 
 public class ThemeManager {
 
+    private static boolean darkModeActive;
+
     public static void setupSystemTheme() {
-    	if (isWindowsDarkMode()) {
-    	    FlatDarkLaf.setup();
-    	} else {
-    	    FlatLightLaf.setup();
-    	}
-    	for (Window w : Window.getWindows()) {
-    	    SwingUtilities.updateComponentTreeUI(w);
-    	    w.pack();
-    	}
+    	darkModeActive = detectSystemDarkMode();
+    	applyTheme();
     }
-    
-    public static boolean isWindowsDarkMode() {
+
+    public static void toggleTheme() {
+        darkModeActive = !darkModeActive;
+        applyTheme();
+    }
+
+    private static void applyTheme() {
+        if (darkModeActive) {
+            FlatDarkLaf.setup();
+        } else {
+            FlatLightLaf.setup();
+        }
+        for (Window w : Window.getWindows()) {
+            SwingUtilities.updateComponentTreeUI(w);
+        }
+    }
+
+    public static boolean isDarkMode() {
+        return darkModeActive;
+    }
+
+    private static boolean detectSystemDarkMode() {
+        String os = System.getProperty("os.name", "").toLowerCase();
+        if (os.contains("win")) {
+            return isWindowsDarkMode();
+        } else if (os.contains("mac")) {
+            return isMacDarkMode();
+        }
+        return false;
+    }
+
+    private static boolean isWindowsDarkMode() {
         try {
             Process process = Runtime.getRuntime().exec(
                 "reg query HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize /v AppsUseLightTheme"
@@ -34,6 +59,19 @@ public class ThemeManager {
                         return line.trim().endsWith("0x0"); // 0 → dark, 1 → light
                     }
                 }
+            }
+        } catch (IOException ignored) {}
+        return false;
+    }
+
+    private static boolean isMacDarkMode() {
+        try {
+            Process process = Runtime.getRuntime().exec(
+                new String[]{"defaults", "read", "-g", "AppleInterfaceStyle"}
+            );
+            try (BufferedReader br = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                String line = br.readLine();
+                return line != null && line.trim().equalsIgnoreCase("Dark");
             }
         } catch (IOException ignored) {}
         return false;

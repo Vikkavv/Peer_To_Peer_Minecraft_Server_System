@@ -42,9 +42,6 @@ import org.xml.sax.SAXException;
 import com.sun.management.OperatingSystemMXBean;
 
 import cloud.ZipUtils;
-import view.GeneralConfigurationsWindows;
-import view.MainFrame;
-import vpn.DiscoveryResponder;
 
 
 public class ForgeUtils {
@@ -252,30 +249,23 @@ public class ForgeUtils {
 		return null;
 	}
 	
-	public static Thread getServerOutputs(Process serverProcess, JTextArea consoleArea) {
+	public static Thread getServerOutputs(Process serverProcess, JTextArea consoleArea, Runnable onServerReady) {
 		 Thread consoleThread = new Thread(() -> {
 		     try (BufferedReader reader = new BufferedReader(new InputStreamReader(serverProcess.getInputStream()))) {
-		
+
 		         String line;
 		         while ((line = reader.readLine()) != null) {
 		             String finalLine = line;
 		             if(finalLine.contains("> \\")) CustomCommands.processCustomCommand(finalLine);
 		             if(finalLine.contains("Done")) {
-		                	MainFrame.responder = new DiscoveryResponder(MainFrame.networkName).listenAsync(MainFrame.actualServerPort);
-		                	MainFrame.window.checkServerStatus();
-		                	
-							if(ZipUtils.existsDirectory(GeneralConfigurationsWindows.USER_OPS_PATH)) {
-								for(String nickname : ZipUtils.getDataFromPropertiesFile("userOps", GeneralConfigurationsWindows.USER_OPS_PATH).split(", ")) {
-									ForgeUtils.sendCommand("/op " + nickname, MainFrame.serverProcess, MainFrame.serverWriter);
-								}
-							}
+		                 if (onServerReady != null) onServerReady.run();
 		             }
 		             SwingUtilities.invokeLater(() -> {
 		                 consoleArea.append(finalLine + "\n");
 		                 consoleArea.setCaretPosition(consoleArea.getDocument().getLength());
 		             });
 		         }
-		
+
 		     } catch (IOException e) {}
 		 }, "ServerOutputReader");
 		 consoleThread.start();
@@ -459,14 +449,16 @@ public class ForgeUtils {
 	public static void setServerPort(Path serverDirectory, int newPort) {
 		Path serverProperties = serverDirectory.resolve("server.properties");
 		if(Files.exists(serverProperties)) {
-			Properties props = new Properties();
-			try(FileInputStream in = new FileInputStream(serverProperties.toFile())){
-				props.load(in);
-				props.setProperty("server-port", "" + newPort);
-			    FileOutputStream out = new FileOutputStream(serverProperties.toFile());
-		        props.store(out, "server properties updated");
-		        out.close();
-			} 
+			try {
+				List<String> lines = Files.readAllLines(serverProperties);
+				for (int i = 0; i < lines.size(); i++) {
+					if (lines.get(i).startsWith("server-port=")) {
+						lines.set(i, "server-port=" + newPort);
+						break;
+					}
+				}
+				Files.write(serverProperties, lines);
+			}
 			catch (IOException e) {
 				JOptionPane.showMessageDialog(null, "File not found or inaccessible (server.properties)", "Error", JOptionPane.ERROR_MESSAGE);
 			}

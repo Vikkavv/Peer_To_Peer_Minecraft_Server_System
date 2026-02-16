@@ -275,24 +275,23 @@ public class GoogleWindows {
 						frame.setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
 						new Thread(() -> {
 							File cloneDirectoryServer = Path.of(cloneDirectory.toString(), names.get(1)).toFile();
-							MainFrame.serverOpenedDirectory = cloneDirectoryServer;
 							GoogleDriveCloudProvider.isSearchingBackUpForClonning = true;
 							boolean clonedSuccessfully = MainFrame.cloudProvider.downloadServerBackup(cloneDirectoryServer.toPath());
 							GoogleDriveCloudProvider.isSearchingBackUpForClonning = false;
 							frame.setCursor(Cursor.getDefaultCursor());
 							if(clonedSuccessfully) {
 						        JOptionPane.showMessageDialog(
-						                null,                   
+						                null,
 						                "Server cloned successfully!",
 						                "Google Drive",
 						                JOptionPane.INFORMATION_MESSAGE
 						        );
 						        googleDriveServerFoldersCloneListDialog.dispose();
-						        MainFrame.window.openServerOptions(MainFrame.contentPane);
+						        MainFrame.window.openServerInNewTab(cloneDirectoryServer);
 							}
 							else {
 								 JOptionPane.showMessageDialog(
-						                null,                   
+						                null,
 						                "Server not installed. This server does not have any backups saved. Please ask the owner to create at least one backup.",
 						                "Google Drive",
 						                JOptionPane.INFORMATION_MESSAGE
