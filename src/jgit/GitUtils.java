@@ -383,7 +383,7 @@ public class GitUtils {
 		
 		try {
 			
-			Git git = Git.open(MainFrame.serverOpenedDirectory);
+			Git git = Git.open(MainFrame.getServerOpenedDirectory());
 			
 			git.add()
 		    	.addFilepattern(".")
@@ -401,7 +401,7 @@ public class GitUtils {
 			return true;
 				
 		} catch (IOException e) {
-			JOptionPane.showMessageDialog(null, "File not found or inaccessible " + MainFrame.serverOpenedDirectory, "Error", JOptionPane.ERROR_MESSAGE);
+			JOptionPane.showMessageDialog(null, "File not found or inaccessible " + MainFrame.getServerOpenedDirectory(), "Error", JOptionPane.ERROR_MESSAGE);
 		} catch (GitAPIException e) {
 			e.printStackTrace();
 		}
@@ -465,19 +465,19 @@ public class GitUtils {
 	
 	public static void activeAutoSave() {
 		//All will be or null/false or notNull/true at the same time, but like this is more compressible the conditional.
-		if(MainFrame.serverIsOn && MainFrame.serverProcess != null && MainFrame.serverWriter != null) {
+		if(MainFrame.isServerOn() && MainFrame.getServerProcess() != null && MainFrame.getServerWriter() != null) {
 			autoSaveProcess = new Thread(() -> {
 				serverAutoSaveIsActive = true;
 				while(serverAutoSaveIsActive) {
 					try {
-						ForgeUtils.sendCommand("/save-off", MainFrame.serverProcess, MainFrame.serverWriter);
-						ForgeUtils.sendCommand("/save-all flush", MainFrame.serverProcess, MainFrame.serverWriter);
-						ForgeUtils.sendCommand("/say Saving world, creating backup...", MainFrame.serverProcess, MainFrame.serverWriter);
+						ForgeUtils.sendCommand("/save-off", MainFrame.getServerProcess(), MainFrame.getServerWriter());
+						ForgeUtils.sendCommand("/save-all flush", MainFrame.getServerProcess(), MainFrame.getServerWriter());
+						ForgeUtils.sendCommand("/say Saving world, creating backup...", MainFrame.getServerProcess(), MainFrame.getServerWriter());
 						//Esto al ser de git lo podrías ignorar y pensar en meter aquí la subida de el google drive...
 						if(!autoCommitAndPush()) {
 							serverAutoSaveIsActive = false;
 						}
-						ForgeUtils.sendCommand("/save-on", MainFrame.serverProcess, MainFrame.serverWriter);
+						ForgeUtils.sendCommand("/save-on", MainFrame.getServerProcess(), MainFrame.getServerWriter());
 						Thread.sleep(autoSaveSecondsInterval * 1000);
 					} catch (InterruptedException e) {
 						e.printStackTrace();

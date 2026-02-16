@@ -2,21 +2,21 @@ package view;
 
 import java.awt.EventQueue;
 import java.awt.FlowLayout;
+import java.awt.Font;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.GridLayout;
 import java.awt.Image;
 import java.awt.Insets;
 import java.awt.Toolkit;
+import java.awt.Color;
 
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JRadioButtonMenuItem;
-import javax.swing.JScrollPane;
-import javax.swing.JTextArea;
+import javax.swing.JTabbedPane;
 import javax.swing.JTextField;
-import javax.swing.JTextPane;
 import javax.swing.SwingUtilities;
 
 import cloud.CloudStorageProvider;
@@ -25,8 +25,6 @@ import cloud.google.GoogleDriveCloudProvider;
 import jgit.GitUtils;
 import jgit.TokenStore;
 import minecraftServerManagement.ForgeUtils;
-import vpn.DiscoveryResponder;
-import vpn.NetworkDiscoverClient;
 
 import java.awt.BorderLayout;
 import java.awt.Cursor;
@@ -35,11 +33,11 @@ import java.awt.Dimension;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
+import javax.swing.JScrollPane;
 import javax.swing.JMenu;
 import javax.swing.AbstractButton;
 import javax.swing.BorderFactory;
 import javax.swing.ButtonGroup;
-import javax.swing.Icon;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
@@ -51,21 +49,15 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Enumeration;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -76,15 +68,10 @@ import java.util.regex.Pattern;
 import javax.swing.SwingConstants;
 
 public class MainFrame {
-	
+
 	private static File newMinecraftServerDirectory = null;
 	private static String forgeMetadata = null;
 	private static String forgeVersion = null;
-	private static JButton turnOnOffBtn = null;
-	private static JTextPane ipServerHostingPane = null;
-	private static JTextArea consoleArea = null;
-	private static Thread consoleThread = null;
-	private static JTextField comandInput = null;
 	private static JMenu recentServersMenu = null;
 	private static JMenuItem addHostingUserBtn = null;
 	private static JMenuItem repoInvitationsBtn = null;
@@ -92,34 +79,38 @@ public class MainFrame {
 	private static JMenuItem gitHubProfileBtn = null;
 	private static JMenuItem cloneRepoBtn = null;
 	private static JMenuItem GoogleAddHostingUserBtn = null;
-	private static ActionListener crbckfldcld;
-	private static JPanel consoleContent = null;
 
 	public static String networkName = null;
-	public static int actualServerPort = 0;
-	public static DiscoveryResponder responder = null;
-	public static JPanel contentPane = null;
-	public static JButton createServerBackupsFolderInCloud = null;
 	public static final Path CLOUD_PROVIDER_IN_USE_PATH = Path.of("data/cloudProviderInUse.properties");
-	public static File serverOpenedDirectory = null;
-	public static BufferedWriter serverWriter = null;
-	public static Process serverProcess = null;
-	public static boolean serverIsOn = false;
 	public static CloudStorageProvider cloudProvider = null;
 	public static String cloudProviderInUse = null;
 	public static String cloudInUseReminderText[];
 	public static JMenuItem cloudInUseReminderMenuText;
 	public static MainFrame window = null;
-	
+	public static ServerPortManager portManager = new ServerPortManager();
+
 	private JFrame frame;
+	private JTabbedPane tabbedPane;
+	private List<ServerTab> serverTabs = new ArrayList<>();
+	private int colorIndex = 0;
+
+	// Color palette for tabs - light/dark pairs
+	private static final Color[][] TAB_COLORS = {
+		{new Color(0x3B82F6), new Color(0x60A5FA)}, // Blue
+		{new Color(0x10B981), new Color(0x34D399)}, // Green
+		{new Color(0xEF4444), new Color(0xF87171)}, // Red
+		{new Color(0xF59E0B), new Color(0xFBBF24)}, // Orange
+		{new Color(0x8B5CF6), new Color(0xA78BFA)}, // Purple
+		{new Color(0xEC4899), new Color(0xF472B6)}, // Pink
+	};
 
 	/**
 	 * Launch the application.
 	 */
 	public static void main(String[] args) {
-		
+
 		ThemeManager.setupSystemTheme();
-		
+
 		EventQueue.invokeLater(new Runnable() {
 			public void run() {
 				try {
@@ -139,26 +130,29 @@ public class MainFrame {
 		initialize();
 	}
 
+	private Color nextTabColor() {
+		int idx = colorIndex % TAB_COLORS.length;
+		colorIndex++;
+		return TAB_COLORS[idx][ThemeManager.isDarkMode() ? 1 : 0];
+	}
+
 	/**
 	 * Initialize the contents of the frame.
 	 */
 	private void initialize() {
 		checkIfExistsDataFolder();
-		//Initialize networkName
 		networkName = ForgeUtils.getNetworkName();
 		if(ZipUtils.existsDirectory(Path.of("data/google_tokens/StoredCredential"))) {
 			cloudProvider = new GoogleDriveCloudProvider();
 			cloudProvider.authenticate();
 		}
 		cloudProviderInUse = ZipUtils.getDataFromPropertiesFile("cloudProviderInUse", CLOUD_PROVIDER_IN_USE_PATH);
-			
-		
+
 		frame = new JFrame();
-		int frameWidht = 800;
-		int frameHeight = 450;
-		frame.setBounds((Toolkit.getDefaultToolkit().getScreenSize().width / 2) - (frameWidht / 2), (Toolkit.getDefaultToolkit().getScreenSize().height / 2) - (frameHeight / 2), frameWidht, frameHeight);
+		int frameWidth = 900;
+		int frameHeight = 550;
+		frame.setBounds((Toolkit.getDefaultToolkit().getScreenSize().width / 2) - (frameWidth / 2), (Toolkit.getDefaultToolkit().getScreenSize().height / 2) - (frameHeight / 2), frameWidth, frameHeight);
 		frame.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
-		
 
         List<Image> icons = List.of(
             new ImageIcon(MainFrame.class.getResource("/icons/P2PMSSIcon-16.png")).getImage(),
@@ -167,7 +161,6 @@ public class MainFrame {
         );
 
         frame.setIconImages(icons);
-		
 		frame.setTitle("Peer To Peer Minecraft Server System");
 
         frame.addWindowListener(new WindowAdapter() {
@@ -176,16 +169,12 @@ public class MainFrame {
             	saveAndClose();
             }
         });
-		
-		JPanel panel = new JPanel();
-		frame.getContentPane().add(panel, BorderLayout.NORTH);
 
-		
 		JMenuBar menuBar = new JMenuBar();
 		menuBar.setBorder(null);
 		menuBar.setBorderPainted(false);
 		frame.setJMenuBar(menuBar);
-		
+
 		JMenu fileMenu = new JMenu("File");
 		JMenu cloudMenu = new JMenu("Cloud");
 		JMenu saveBackupsToCloudMenu = new JMenu("Save backups to cloud...");
@@ -196,58 +185,58 @@ public class MainFrame {
 		cloudInUseReminderText = new String[]{"<html><span style=' color: rgb(177, 177, 177);'>%s.</span></html>", "Currently saving backups in ", "No cloud provider configured yet", "%s choosen for saving backups, but you are not logged in"};
 		cloudInUseReminderMenuText = new JMenuItem(cloudInUseReminderText[0].formatted(cloudProviderInUse != null ? ( cloudProviderInUse.equals("GitHub") && !TokenStore.sessionIsOpened() ? cloudInUseReminderText[3].formatted(cloudProviderInUse) : ( cloudProvider == null ? cloudInUseReminderText[3].formatted(cloudProviderInUse) : cloudInUseReminderText[1] + cloudProviderInUse)) : cloudInUseReminderText[2]));
 		cloudInUseReminderMenuText.setEnabled(false);
-		
+
 		menuBar.add(fileMenu);
 		menuBar.add(cloudMenu);
 		cloudMenu.add(saveBackupsToCloudMenu);
 		cloudMenu.add(gitMenu);
 		cloudMenu.add(googleDriveMenu);
 		cloudMenu.add(cloudInUseReminderMenuText);
-		
+
 		JRadioButtonMenuItem gitMenuItem = new JRadioButtonMenuItem("GitHub");
 		gitMenuItem.setIcon(new ImageIcon(MainFrame.class.getResource("/icons/github.png")));
 		gitMenuItem.addActionListener(ghList -> {
 			radioBtnListener(cloudMenu, saveBackupsToCloudMenu, gitMenuItem);
 		});
-		
+
 		JRadioButtonMenuItem googleDriveMenuItem = new JRadioButtonMenuItem("Google Drive");
 		googleDriveMenuItem.setIcon(new ImageIcon(MainFrame.class.getResource("/icons/google-drive.png")));
 		googleDriveMenuItem.addActionListener(gglList -> {
 			radioBtnListener(cloudMenu, saveBackupsToCloudMenu, googleDriveMenuItem);
 		});
-		
+
 		ButtonGroup group = new ButtonGroup();
 		group.add(gitMenuItem);
 		group.add(googleDriveMenuItem);
-		
+
 		Iterator<AbstractButton> it = group.getElements().asIterator();
 		while(it.hasNext()) {
 			JRadioButtonMenuItem radioBtn = (JRadioButtonMenuItem) it.next();
 			if(radioBtn.getText().replaceAll(" ", "").equals(cloudProviderInUse)) radioBtn.setSelected(true);
 		}
-		
+
 		saveBackupsToCloudMenu.add(gitMenuItem);
 		saveBackupsToCloudMenu.add(googleDriveMenuItem);
-		
+
 		JMenuItem installInvitedServerBtn = new JMenuItem("Install invited server folder");
 		installInvitedServerBtn.addActionListener(insInviServBtn -> {
 			GoogleWindows.cloneServerFolderWnd(frame);
 		});
-		
+
 		JMenuItem signOutDriveBtn = new JMenuItem("Sign out");
 		JMenuItem loggedInGoogleDriveText = new JMenuItem("<html><span style='color: rgb(177, 177, 177);'>Logged in Google Drive</span></html>");
 		loggedInGoogleDriveText.setEnabled(false);
-		
+
 		JMenuItem googleProfileBtn = new JMenuItem("Profile");
 		googleProfileBtn.addActionListener(gglprf -> {
 			GoogleWindows.googleProfileWnd();
 		});
-		
+
 		GoogleAddHostingUserBtn = new JMenuItem("Add hosting user");
 		GoogleAddHostingUserBtn.addActionListener(gglhtusrBtn -> {
 			GoogleWindows.addHostingUser();
 		});
-	
+
 		JMenuItem signIntoDriveBtn = new JMenuItem("Sign into Google Drive");
 		signIntoDriveBtn.addActionListener(sgnggldr -> {
 			cloudProvider = new GoogleDriveCloudProvider();
@@ -267,7 +256,7 @@ public class MainFrame {
 				}
 			});
 		});
-		
+
 		signOutDriveBtn.addActionListener(sgntDrvBtn -> {
 			String savedProviderName = cloudProvider.getProviderName();
 			cloudProvider.closeSession();
@@ -283,7 +272,7 @@ public class MainFrame {
 				}
 			}
 		});
-		
+
 		if(cloudProvider == null || !cloudProvider.isSessionOpened() && cloudProvider instanceof GoogleDriveCloudProvider) {
 			loggedInGoogleDriveText.setVisible(false);
 			signIntoDriveBtn.setVisible(true);
@@ -298,19 +287,19 @@ public class MainFrame {
 			googleProfileBtn.setVisible(true);
 			installInvitedServerBtn.setVisible(true);
 		}
-		
+
 		googleDriveMenu.add(signIntoDriveBtn);
 		googleDriveMenu.add(loggedInGoogleDriveText);
 		googleDriveMenu.add(googleProfileBtn);
 		googleDriveMenu.add(GoogleAddHostingUserBtn);
 		googleDriveMenu.add(installInvitedServerBtn);
 		googleDriveMenu.add(signOutDriveBtn);
-		
+
 		addHostingUserBtn = new JMenuItem("Add hosting user");
 		addHostingUserBtn.addActionListener(addhstngUsrBtn -> {
 			GitWindows.addHostingUser();
 		});
-		
+
 		JMenuItem gitSignInBtn = new JMenuItem("Sign into GitHub");
 		gitSignInBtn.addActionListener(gitLis ->{
 			GitWindows.signIntoGitHubWnd(() -> {
@@ -321,8 +310,9 @@ public class MainFrame {
 				if(cloudProviderInUse.equals("GitHub")) {
 					cloudInUseReminderMenuText.setText(cloudInUseReminderText[0].formatted(cloudInUseReminderText[1] + cloudProviderInUse));
 				}
-				if(serverOpenedDirectory != null) {
-					if(!GitUtils.repoExistInPath(serverOpenedDirectory.toPath())) {
+				ServerTab activeTab = getActiveServerTab();
+				if(activeTab != null) {
+					if(!GitUtils.repoExistInPath(activeTab.getServerDirectory().toPath())) {
 						addHostingUserBtn.setVisible(false);
 					}
 					else {
@@ -331,7 +321,7 @@ public class MainFrame {
 				}
 			});
 		});
-		
+
 		gitSignOutBtn = new JMenuItem("Sign out");
 		gitSignOutBtn.addActionListener(gitOut -> {
 			TokenStore.clear();
@@ -343,51 +333,42 @@ public class MainFrame {
 			gitHubProfileBtn.setVisible(false);
 			addHostingUserBtn.setVisible(false);
 			cloneRepoBtn.setVisible(false);
-			addHostingUserBtn.setVisible(false);
 		});
-		
+
 		repoInvitationsBtn = new JMenuItem("Server Invitations");
 		repoInvitationsBtn.addActionListener(rpInvt -> {
 			GitWindows.invitationslistWnd();
 		});
-		
+
 		gitHubProfileBtn = new JMenuItem("Profile");
 		gitHubProfileBtn.addActionListener(prfBtn -> {
 			GitWindows.gitHubProfileWnd();
 		});
-		
+
 		cloneRepoBtn = new JMenuItem("clone a server repo");
 		cloneRepoBtn.addActionListener(clnRpBtn -> {
 			GitWindows.cloneRepoWnd(frame);
 		});
-		
+
 		if(!TokenStore.sessionIsOpened()) {
 			gitSignOutBtn.setVisible(false);
 			repoInvitationsBtn.setVisible(false);
 			gitHubProfileBtn.setVisible(false);
 			addHostingUserBtn.setVisible(false);
 			cloneRepoBtn.setVisible(false);
-			addHostingUserBtn.setVisible(false);
 		}
-		
+
 		gitMenu.add(gitSignInBtn);
 		gitMenu.add(gitHubProfileBtn);
 		gitMenu.add(cloneRepoBtn);
 		gitMenu.add(addHostingUserBtn);
 		gitMenu.add(repoInvitationsBtn);
 		gitMenu.add(gitSignOutBtn);
-		
-		createServerBackupsFolderInCloud = new JButton("Create backups folder in %s".formatted(cloudProviderInUse));
-		
-		contentPane = new JPanel(new FlowLayout(FlowLayout.CENTER));
-		openServerOptions(contentPane);
-		frame.getContentPane().add(contentPane);
-		if(serverOpenedDirectory != null) {
-			actualServerPort = ForgeUtils.getServerPort(serverOpenedDirectory.toPath());
-			checkServerStatus();
-		}
-		contentPane.setVisible(true);
-		
+
+		// Initialize tabbed pane
+		tabbedPane = new JTabbedPane();
+		frame.getContentPane().add(tabbedPane, BorderLayout.CENTER);
+
 		JMenuItem btnNewMinecraftServer = new JMenuItem("New Minecraft Server");
 		btnNewMinecraftServer.setHorizontalAlignment(SwingConstants.LEFT);
 		btnNewMinecraftServer.addActionListener(mcSrv -> {
@@ -398,36 +379,33 @@ public class MainFrame {
 				newMinecraftServerDirectory = fileChooser.getSelectedFile();
 				if(newMinecraftServerDirectory.isDirectory() && newMinecraftServerDirectory.list().length != 0) {
 		            JOptionPane.showMessageDialog(
-		                   panel,
+		                   frame,
 		                    "Debe seleccionar un directorio vacío.",
 		                    "Error",
 		                    JOptionPane.ERROR_MESSAGE
 		            );
 				}
 				else {
-					// We create a new window to select the Minecraft version to create a Forge server.
 					JDialog versionSelectFrame = new JDialog();
 					versionSelectFrame.setResizable(false);
 					int versionSelectWidht = 500;
 					int versionSelectHeight = 300;
 					versionSelectFrame.setSize(versionSelectWidht, versionSelectHeight);
-					versionSelectFrame.setLocationRelativeTo(panel);
+					versionSelectFrame.setLocationRelativeTo(frame);
 					versionSelectFrame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 					versionSelectFrame.setVisible(true);
-					//We create a JPanel to dispose all the elements of the UI interface.
 					JPanel versionSelectPanel = new JPanel(new BorderLayout());
 					versionSelectFrame.getContentPane().add(versionSelectPanel);
-					
+
 					JPanel contentPanel = new JPanel();
 					JLabel label = new JLabel("Selecciona la version de minecraft y Forge");
 					JPanel selectsPanel = new JPanel(new GridBagLayout());
 					GridBagConstraints gbc = new GridBagConstraints();
 					gbc.fill = GridBagConstraints.HORIZONTAL;
 					gbc.insets = new Insets(80, 35, 80, 35);
-					
-					//We collect all the versions to show them in the selects.
+
 					forgeMetadata = ForgeUtils.downloadForgeMetadata();
-					
+
 					JComboBox<String> minecraftVersionsSelect = new JComboBox<String>(ForgeUtils.getMinecraftVersionsList(forgeMetadata).toArray(new String[0]));
 					JComboBox<String> forgeVersionsSelect = new JComboBox<String>();
 					minecraftVersionsSelect.addActionListener(fgs -> {
@@ -442,7 +420,7 @@ public class MainFrame {
 							}
 							else forgeVersionsSelect.setVisible(false);
 					});
-					
+
 					gbc.gridx = 1;
 					gbc.weightx = 0.5;
 					selectsPanel.add(forgeVersionsSelect, gbc);
@@ -453,13 +431,11 @@ public class MainFrame {
 					contentPanel.add(label, FlowLayout.LEFT);
 					contentPanel.add(selectsPanel, BorderLayout.SOUTH);
 					versionSelectPanel.add(contentPanel, BorderLayout.CENTER);
-					
-					//We create a wrapper for the buttons.
+
 					JPanel buttonsWrapper = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-					//Buttons...
 					JButton versionAcceptButton = new JButton("Aceptar");
 					versionAcceptButton.setEnabled(false);
-					
+
 					forgeVersionsSelect.addActionListener(fgs -> {
 						if(forgeVersionsSelect.isVisible()) {
 							forgeVersion = forgeVersionsSelect.getSelectedItem().toString();
@@ -476,8 +452,8 @@ public class MainFrame {
 						versionSelectFrame.setCursor(Cursor.getDefaultCursor());
 						Object[] buttonsOptions = {"Open EULA", "Cancel", "Accept"};
 			            int opt = JOptionPane.showOptionDialog(
-			                    null, 
-			                    "By pressing accept you are agreeding the terms and conditions of MinecraftEula", 
+			                    null,
+			                    "By pressing accept you are agreeding the terms and conditions of MinecraftEula",
 			                    "Do you want to accept the EULA?",
 			                    JOptionPane.INFORMATION_MESSAGE,
 			                    JOptionPane.DEFAULT_OPTION,
@@ -510,28 +486,28 @@ public class MainFrame {
 			            	ForgeUtils.openURL("https://aka.ms/MinecraftEULA");
 			            }
 					});
-					
+
 					JButton versionCancelButton = new JButton("Cancelar");
 					buttonsWrapper.add(versionCancelButton);
 					buttonsWrapper.add(versionAcceptButton);
-					
+
 					versionCancelButton.addMouseListener(new MouseAdapter() {
 						@Override
 						public void mouseClicked(MouseEvent e) {
 							versionSelectFrame.dispose();
 						}
 					});
-					
+
 					versionSelectPanel.add(buttonsWrapper, BorderLayout.SOUTH);
-			
+
 					versionSelectFrame.setVisible(true);
 					forgeVersionsSelect.setVisible(false);
 				}
 			}
-			
+
 			if(result == JFileChooser.CANCEL_OPTION) newMinecraftServerDirectory = null;
 		});
-		
+
 		JMenuItem openServerFolderBtn = new JMenuItem("Open Server Folder");
 		openServerFolderBtn.setHorizontalAlignment(SwingConstants.LEFT);
 		openServerFolderBtn.addActionListener(opSer -> {
@@ -539,315 +515,140 @@ public class MainFrame {
 			fileChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
 			int result = fileChooser.showOpenDialog(frame);
 			if(result == JFileChooser.APPROVE_OPTION) {
-				serverOpenedDirectory = fileChooser.getSelectedFile();
-				actualServerPort = ForgeUtils.getServerPort(serverOpenedDirectory.toPath());
-				if(serverOpenedDirectory.isDirectory()) {
-					if(Files.exists(Paths.get(serverOpenedDirectory.toPath().toString()+"/run.bat")) || Files.exists(Paths.get(serverOpenedDirectory.toPath().toString()+"/start.bat"))) {
-						openServerOptions(contentPane);
-						Properties props = new Properties();
-						if(!(Files.exists(Paths.get("data/recentServers.properties")))) {
-							try {
-								Files.createFile(Paths.get("data/recentServers.properties"));
-							} catch (IOException e) {
-								JOptionPane.showMessageDialog(null, "File not found or inaccessible", "Error", JOptionPane.ERROR_MESSAGE);
-							}
-						}
-						File file = new File("data/recentServers.properties");
-						try(FileInputStream in = new FileInputStream(file)){
-							props.load(in);
-							String recentServers = "";
-							if(props.containsKey("recentServers"))
-								//If the path is not included yet, we add them at the beginning, otherwise, we search the string-path in the value and move it to the beginning as it is the most recent folder opened.
-								if(!(props.get("recentServers").toString().contains(serverOpenedDirectory.toPath().toString().replaceAll("\\\\", "/")))) recentServers = serverOpenedDirectory.toPath().toString().replaceAll("\\\\", "/") + "|" +  props.getProperty("recentServers");
-								else recentServers = serverOpenedDirectory.toPath().toString().replaceAll("\\\\", "/") + "|" + props.getProperty("recentServers").replaceAll(serverOpenedDirectory.toPath().toString().replaceAll("\\\\", "/"), "").replace("||", "|").replaceAll("[|\\n]", "");
-							else recentServers = serverOpenedDirectory.toPath().toString().replaceAll("\\\\", "/");
-							props.setProperty("recentServers", recentServers);
-						    FileOutputStream out = new FileOutputStream(file);
-					        props.store(out, "Updated recent servers");
-					        out.close();
-						}
-						catch(IOException e) {
-							JOptionPane.showMessageDialog(null, "File not found or inaccessible", "Error", JOptionPane.ERROR_MESSAGE);
-						}
+				File selectedDir = fileChooser.getSelectedFile();
+				if(selectedDir.isDirectory()) {
+					if(Files.exists(Paths.get(selectedDir.toPath().toString()+"/run.bat")) || Files.exists(Paths.get(selectedDir.toPath().toString()+"/start.bat"))) {
+						openServerInNewTab(selectedDir);
+						saveToRecentServers(selectedDir);
 					}
 					else JOptionPane.showMessageDialog(null, "Select a minecraft server folder", "Error", JOptionPane.ERROR_MESSAGE);
 				}
 				else {
-					serverOpenedDirectory = null;
 					JOptionPane.showMessageDialog(null, "The selected destination must be a server directory", "Error", JOptionPane.ERROR_MESSAGE);
 				}
 			}
 		});
-		
+
 		recentServersMenu = new JMenu("Recent files...");
 		recentServerListGenerator();
-		
+
 		JMenuItem generalConfigurationsMenuItem = new JMenuItem("General configurations");
 		generalConfigurationsMenuItem.addActionListener(gncnf -> {
 			GeneralConfigurationsWindows.generalConfigurations();
 		});
-		
+
+		JMenuItem toggleThemeBtn = new JMenuItem(ThemeManager.isDarkMode() ? "Switch to Light Mode" : "Switch to Dark Mode");
+		toggleThemeBtn.addActionListener(thm -> {
+			ThemeManager.toggleTheme();
+			toggleThemeBtn.setText(ThemeManager.isDarkMode() ? "Switch to Light Mode" : "Switch to Dark Mode");
+		});
+
 		fileMenu.add(openServerFolderBtn);
 		fileMenu.add(btnNewMinecraftServer);
 		fileMenu.add(recentServersMenu);
 		fileMenu.add(generalConfigurationsMenuItem);
+		fileMenu.addSeparator();
+		fileMenu.add(toggleThemeBtn);
+
+		// Auto-open the most recent server if available
+		File lastServer = getLastOpenedServer();
+		if (lastServer != null) {
+			openServerInNewTab(lastServer);
+		}
 	}
-	
-	public void checkServerStatus() {
-		String networkDiscoveryResult = NetworkDiscoverClient.surroundDiscoverIOException(networkName, actualServerPort, 3000);
-		if(networkDiscoveryResult != "NotFound") {
-			ipServerHostingPane.setText("Server ip: " + networkDiscoveryResult);
-			if(!serverIsOn) turnOnOffBtn.setEnabled(false);
+
+	public void openServerInNewTab(File serverDir) {
+		// Check if a tab for this directory already exists
+		for (int i = 0; i < serverTabs.size(); i++) {
+			if (serverTabs.get(i).getServerDirectory().getAbsolutePath().equals(serverDir.getAbsolutePath())) {
+				tabbedPane.setSelectedIndex(i);
+				return;
+			}
 		}
-		else {
-			ipServerHostingPane.setText("Server is off");
-			turnOnOffBtn.setEnabled(true);
-		}
-		ipServerHostingPane.setVisible(true);
+
+		Color tabColor = nextTabColor();
+		ServerTab tab = new ServerTab(serverDir, tabColor);
+		JPanel panel = tab.buildServerPanel();
+		serverTabs.add(tab);
+
+		int index = tabbedPane.getTabCount();
+		tabbedPane.addTab(tab.getServerName(), panel);
+		tabbedPane.setTabComponentAt(index, createTabComponent(tab));
+		tabbedPane.setSelectedIndex(index);
+
+		recentServerListGenerator();
 	}
-	
-	public void openServerOptions(JPanel fatherFrame) {
-		fatherFrame.removeAll();
-		if(serverOpenedDirectory == null) {
-			Properties props = new Properties();
-			if(!(Files.exists(Paths.get("data/recentServers.properties")))) {
-				try {
-					Files.createFile(Paths.get("data/recentServers.properties"));
-					fatherFrame.add(new JLabel("Open a minecraft server folder"));
-					return;
-				} catch (IOException e) {
-					e.printStackTrace();
-					JOptionPane.showMessageDialog(null, "File not found or inaccessible", "Error", JOptionPane.ERROR_MESSAGE);
-				}
-			}
-			else {
-				File file = new File("data/recentServers.properties");
-				try(FileInputStream in = new FileInputStream(file)) {
-					props.load(in);
-					if(props.containsKey("recentServers")) {
-						serverOpenedDirectory = new File(props.getProperty("recentServers").split("\\|")[0]);
-					}
-					else { 
-						fatherFrame.add(new JLabel("Open a minecraft server folder"));
-						return;
-					}
-				} catch (IOException e1) {
-					e1.printStackTrace();
-					JOptionPane.showMessageDialog(null, "File not found or inaccessible", "Error", JOptionPane.ERROR_MESSAGE);
-				}
-			}
-		}
-		
-		if(cloudProvider != null && cloudProviderInUse.equals("GitHub")) {
-			if(!GitUtils.repoExistInPath(serverOpenedDirectory.toPath())) {
-				addHostingUserBtn.setVisible(false);
-			}
-			else {
-				if(TokenStore.sessionIsOpened()) addHostingUserBtn.setVisible(true);
-				if(TokenStore.sessionIsOpened() && GitUtils.isRemoteRepoHeadFordward(serverOpenedDirectory.toPath()) && cloudProviderInUse != null && cloudProviderInUse == "GitHub")
-					new Thread(() -> {
-						GitUtils.pull(serverOpenedDirectory.toPath());
-					}).start();
-			}
-		}
-		if(cloudProvider != null && cloudProvider.getProviderName().equals(cloudProviderInUse) && cloudProvider.isSessionOpened()) {
-			if(cloudProvider.hasRemoteServerFolder()) {
-				GoogleAddHostingUserBtn.setVisible(true);
-				createServerBackupsFolderInCloud.setVisible(false);
-			}
-			else {
-				GoogleAddHostingUserBtn.setVisible(false);
-				createServerBackupsFolderInCloud.setVisible(true);
-			}
-				
-			new Thread(() -> {
-				cloudProvider.downloadServerBackup(serverOpenedDirectory.toPath());
-			}).start();
-		}
-		
-		JPanel content = new JPanel(new BorderLayout());
-		consoleContent = new JPanel(new BorderLayout());
-		JPanel topContent = new JPanel(new BorderLayout());
-		JPanel leftContent = new JPanel(new FlowLayout(FlowLayout.CENTER));
-		JPanel rightContent = new JPanel(new FlowLayout(FlowLayout.CENTER));
-		JLabel serverName = new JLabel("Server: " + getServerName());
-		turnOnOffBtn = new JButton("On");
-		turnOnOffBtn.setEnabled(false);
-		
-		
-		turnOnOffBtn.addActionListener(trnOnOffBtn -> {
-			if(!serverIsOn) {
-				String networkDiscoveryResult = NetworkDiscoverClient.surroundDiscoverIOException(networkName, actualServerPort, 3000);
-				if(networkDiscoveryResult != "NotFound") {
-			        JOptionPane.showMessageDialog(
-			                null,                   
-			                "Server already opened by other host, if you really want to turn it on, change the networkName in configuration menu.",
-			                "Info",
-			                JOptionPane.INFORMATION_MESSAGE
-			        );
-			        turnOnOffBtn.setEnabled(false);
-					return;
-				}
-				String serverNameString = serverName.getText();
-				serverName.setText(serverNameString + " - Server is turning on...");
-				topContent.revalidate();
-				topContent.repaint();
-				fatherFrame.setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
-				
-				new Thread(() -> {
-					try {
-						serverProcess = ForgeUtils.executeMinecraftServer(serverOpenedDirectory.toPath());
-						//If is done...
-						if(serverProcess != null) {
-							fatherFrame.setCursor(Cursor.getDefaultCursor());
-							serverName.setText(serverNameString);
-							turnOnOffBtn.setText("Off");
-							serverIsOn = true;
-							consoleArea = new JTextArea(15, 60);
-							JScrollPane scroll = new JScrollPane(consoleArea);
-							consoleArea.setEditable(false);
-							comandInput = new JTextField();
-							comandInput.setColumns(20);
-							consoleContent.add(scroll, BorderLayout.CENTER);
-							consoleContent.add(comandInput, BorderLayout.SOUTH);
-							comandInput.addActionListener(msg -> {
-								ForgeUtils.sendCommand(comandInput.getText(), serverProcess, serverWriter);
-								comandInput.setText("");
-							});
-							consoleThread = ForgeUtils.getServerOutputs(serverProcess, consoleArea);
-							serverWriter = ForgeUtils.configureServerWriter(serverProcess, serverWriter);
-//							if(TokenStore.sessionIsOpened() && GitUtils.repoExistInPath(serverOpenedDirectory.toPath())) GitUtils.activeAutoSave();
-							content.add(consoleContent, BorderLayout.SOUTH);
-							consoleContent.revalidate();
-							consoleContent.repaint();
-						}
-					}catch(Exception e) {} 
-				}).start();
-			}
-			else {
-				turnOffServer();
-			}
-		});
-		
-		
-		JButton openServerModsFolderBtn = new JButton("Open Mods Folder");
-		openServerModsFolderBtn.addActionListener(mds -> {
-			if(!ZipUtils.existsDirectory(serverOpenedDirectory.toPath().resolve("mods"))) ZipUtils.createDirectory(serverOpenedDirectory.toPath().resolve("mods"));
-			ForgeUtils.openModsFolder(serverOpenedDirectory.toPath());
-		});
-		
-		JButton serverConfigBtn = new JButton("Configurations");
-		serverConfigBtn.addActionListener(conf -> {
-			serverConfigsFrame(fatherFrame);
-		});
-		
-		crbckfldcld = crbckfldcld -> {
-			new Thread(() -> {
-				frame.setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
-				cloudProvider.createSavingFolder();
-				frame.setCursor(Cursor.getDefaultCursor());
-			}).start();
-		};
-		createServerBackupsFolderInCloud.addActionListener(crbckfldcld);
-		
-		JButton createServerRepoBtn = new JButton("Create repository");
-		createServerRepoBtn.addActionListener(repo -> {
-			fatherFrame.setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
-			//First we create a local repository in the server path
-			boolean localRepoCreated = GitUtils.createRepoIfNotExistsInPath(serverOpenedDirectory.toPath());
-			if(localRepoCreated) { //If created successfully..
-				
-				//We retrieve the GitHub token if session is signed
-				String token;
-				try {token = TokenStore.loadToken();} 
-				catch(Exception e) {JOptionPane.showMessageDialog(null, "The GitHub token is not correct, invalid or nonexistent, consider sign in again", "Error", JOptionPane.ERROR_MESSAGE); return;}
-				
-				//We create the repository in GitHub using the official API
-				String json = GitUtils.createRepoInGitHub(token, getServerName());
-				//Convert the String json that returns to a Map to access easily to the key-value fields.
-				Map<String, String> responseMap = GitUtils.convertJsonStringToMap(json);
-				//We link the local Git repository to the external GitHub repository.
-				boolean repoCreatedCorrectly = GitUtils.linkLocalRepoToExternal(responseMap.get("clone_url"), token, serverOpenedDirectory.toPath());
-				
-				//We skip this two files in the workTree to conserve the local configuration of each user that host the server in this repository.
-				GitUtils.setSkipWorktree(serverOpenedDirectory.toPath(), Path.of(serverOpenedDirectory.toString() + "/server.properties"), true);
-				GitUtils.setSkipWorktree(serverOpenedDirectory.toPath(), Path.of(serverOpenedDirectory.toString() + "/user_jvm_args.txt"), true);
-				
-				if(repoCreatedCorrectly) {
-					fatherFrame.setCursor(Cursor.getDefaultCursor());
-			        JOptionPane.showMessageDialog(
-			                frame,                   
-			                "Repo created and linked successfully!",
-			                "Git",
-			                JOptionPane.INFORMATION_MESSAGE
-			        );
-			        openServerOptions(fatherFrame);
-			        return;
-				}
-				else {
-					JOptionPane.showMessageDialog(null, "Something went wrong, try again.", "Error", JOptionPane.ERROR_MESSAGE);
-				}
-			}
-		});
-		
-		ipServerHostingPane = new JTextPane();
-		ipServerHostingPane.setEditable(false);
-		ipServerHostingPane.setVisible(false);
-		
-		JButton refreshBtn = new JButton("Refresh");
-		refreshBtn.addActionListener(rfshBtnE -> {
-			fatherFrame.setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
-			checkServerStatus();
-			fatherFrame.setCursor(Cursor.getDefaultCursor());
-		});
-		
-		fatherFrame.add(content, BorderLayout.CENTER);
-		content.add(leftContent, BorderLayout.WEST);
-		content.add(rightContent, BorderLayout.EAST);
-		content.add(topContent, BorderLayout.NORTH);
-		topContent.add(serverName);
-		leftContent.add(turnOnOffBtn);
-		rightContent.add(ipServerHostingPane);
-		rightContent.add(refreshBtn);
-		rightContent.add(openServerModsFolderBtn);
-		if(!GitUtils.repoExistInPath(serverOpenedDirectory.toPath()) && TokenStore.sessionIsOpened() && cloudProviderInUse != null && cloudProviderInUse.equals("GitHub"))
-			rightContent.add(createServerRepoBtn);
-		if(cloudProviderInUse != null && cloudProvider != null && cloudProvider.getProviderName().equals(cloudProviderInUse) && cloudProvider.isSessionOpened())
-			rightContent.add(createServerBackupsFolderInCloud);
-		rightContent.add(serverConfigBtn);
-		checkServerStatus();
-		fatherFrame.revalidate();
-		fatherFrame.repaint();
-		if(recentServersMenu != null) recentServerListGenerator();
+
+	private JPanel createTabComponent(ServerTab tab) {
+		JPanel tabComponent = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 0));
+		tabComponent.setOpaque(false);
+
+		JLabel titleLabel = new JLabel(tab.getServerName());
+		titleLabel.setForeground(tab.getTabColor());
+		titleLabel.setFont(titleLabel.getFont().deriveFont(Font.BOLD));
+
+		JButton closeBtn = new JButton("\u00D7");
+		closeBtn.setFont(new Font("SansSerif", Font.BOLD, 14));
+		closeBtn.setBorderPainted(false);
+		closeBtn.setContentAreaFilled(false);
+		closeBtn.setFocusPainted(false);
+		closeBtn.setPreferredSize(new Dimension(20, 20));
+		closeBtn.addActionListener(e -> closeServerTab(tab));
+
+		tabComponent.add(titleLabel);
+		tabComponent.add(closeBtn);
+		return tabComponent;
 	}
-	
+
+	public void closeServerTab(ServerTab tab) {
+		if (tab.isServerOn()) {
+			int confirm = JOptionPane.showConfirmDialog(frame,
+					"Server '%s' is still running. Stop it and close the tab?".formatted(tab.getServerName()),
+					"Confirm close",
+					JOptionPane.YES_NO_OPTION);
+			if (confirm != JOptionPane.YES_OPTION) return;
+			tab.turnOffServer();
+		}
+
+		int index = serverTabs.indexOf(tab);
+		if (index >= 0) {
+			serverTabs.remove(index);
+			tabbedPane.removeTabAt(index);
+		}
+	}
+
+	public ServerTab getActiveServerTab() {
+		int index = tabbedPane.getSelectedIndex();
+		if (index >= 0 && index < serverTabs.size()) {
+			return serverTabs.get(index);
+		}
+		return null;
+	}
+
 	private void saveAndClose() {
-		if(serverIsOn) {
+		// Check if any servers are running
+		boolean anyRunning = serverTabs.stream().anyMatch(ServerTab::isServerOn);
+		if (anyRunning) {
 	        JOptionPane.showMessageDialog(
-	                frame,                   
-	                "Guardando mundo y cerrando servidor",
-	                "Server activo",
+	                frame,
+	                "Guardando mundos y cerrando servidores activos",
+	                "Servidores activos",
 	                JOptionPane.INFORMATION_MESSAGE
 	        );
 	        frame.setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
-	        ForgeUtils.sendCommand("/stop", serverProcess, serverWriter);
-	        try { 
-	            serverProcess.waitFor();
-	            if(TokenStore.sessionIsOpened() && GitUtils.repoExistInPath(serverOpenedDirectory.toPath())) GitUtils.autoCommitAndPush(true);
-	            SwingUtilities.invokeLater(() -> {
-		            frame.setCursor(Cursor.getDefaultCursor());
-
-	            });
-	        } catch (InterruptedException e) {
-	            e.printStackTrace();
-            }
+	        for (ServerTab tab : serverTabs) {
+	        	if (tab.isServerOn()) {
+	        		tab.turnOffServerSync();
+	        	}
+	        }
+	        frame.setCursor(Cursor.getDefaultCursor());
 	    }
-		
+
 	    frame.dispose();
 	    System.exit(0);
 	}
-	
-	private void serverConfigsFrame(JPanel fatherFrame) {
+
+	void serverConfigsFrame(JPanel fatherFrame, ServerTab tab) {
 		JDialog configDialog = new JDialog(frame, "Server Configurations");
 		configDialog.getContentPane().setLayout(new BorderLayout());
 		configDialog.setResizable(false);
@@ -856,11 +657,10 @@ public class MainFrame {
 		configDialog.setSize(configDialogWidht, configDialogHeight);
 		configDialog.setLocationRelativeTo(fatherFrame);
 		configDialog.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-		
-		//Array for the autoSaveSelect
+
 		String[] autoSaveIntervalsTexts = { "5 mins", "10 mins", "30 mins", "1 h", "2 h" };
 		int[] autoSaveIntervalsInts = { 5 * 60, 10 * 60, 30 * 60, 1 * 60 * 60, 2 * 60 * 60 };
-		
+
 		JPanel contentPane = new JPanel(new GridLayout(8, 1));
 		JPanel buttonsPane = new JPanel(new FlowLayout(FlowLayout.RIGHT));
 		JScrollPane scroll = new JScrollPane(contentPane);
@@ -873,21 +673,22 @@ public class MainFrame {
 		JTextField serverPortInput = new JTextField();
 		JLabel serverRamAllocLabel = new JLabel("RAM (GB or MB)");
 		JTextField serverRamAllocInput = new JTextField();
-		
+
 		JLabel autoSaveIntervalLabel = new JLabel("Intervalo del autoguardado");
 		JComboBox<String> autoSaveIntervalSelect = new JComboBox<String>(autoSaveIntervalsTexts);
 		autoSaveIntervalLabel.setVisible(false);
 		autoSaveIntervalSelect.setVisible(false);
-		
+
 		autoSaveIntervalSelect.setSelectedIndex(Arrays.binarySearch(autoSaveIntervalsInts, GitUtils.getSavedAutoSaveInteval()));
 		JButton saveBtn = new JButton("Save");
-		
+
+		File serverDir = tab.getServerDirectory();
 		contentPane.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
 		scroll.setBorder(null);
 		networkIDInput.setText(ForgeUtils.getNetworkName());
-		serverPortInput.setText(ForgeUtils.getServerPort(serverOpenedDirectory.toPath())+"");
-		serverRamAllocInput.setText(ForgeUtils.getServerRAMAlloc(serverOpenedDirectory.toPath()).replaceAll("[-Xmx|G|M]",""));
-		
+		serverPortInput.setText(ForgeUtils.getServerPort(serverDir.toPath())+"");
+		serverRamAllocInput.setText(ForgeUtils.getServerRAMAlloc(serverDir.toPath()).replaceAll("[-Xmx|G|M]",""));
+
 		contentPane.add(networkIDLabel);
 		contentPane.add(networkIDInput);
 		contentPane.add(serverPortLabel);
@@ -899,24 +700,25 @@ public class MainFrame {
 		buttonsPane.add(saveBtn);
 		configDialog.getContentPane().add(scroll, BorderLayout.NORTH);
 		configDialog.getContentPane().add(buttonsPane, BorderLayout.SOUTH);
-		
+
 		configDialog.setVisible(true);
-		
+
 		saveBtn.addActionListener(save -> {
 			if(!(ForgeUtils.getNetworkName().equals(networkIDInput.getText()))){
 				ForgeUtils.setNetworkName(networkIDInput.getText());
 				networkName = networkIDInput.getText();
 			}
-			if(!((ForgeUtils.getServerPort(serverOpenedDirectory.toPath())+"").equals(serverPortInput.getText()))){
-				ForgeUtils.setServerPort(serverOpenedDirectory.toPath(), Integer.parseInt(serverPortInput.getText()));
-				actualServerPort = Integer.parseInt(serverPortInput.getText());
+			if(!((ForgeUtils.getServerPort(serverDir.toPath())+"").equals(serverPortInput.getText()))){
+				int newPort = Integer.parseInt(serverPortInput.getText());
+				ForgeUtils.setServerPort(serverDir.toPath(), newPort);
+				tab.setServerPort(newPort);
 			}
-			if(!((ForgeUtils.getServerRAMAlloc(serverOpenedDirectory.toPath())+"").replaceAll("[-Xmx|G|M]", "").equals(serverRamAllocInput.getText().replaceAll("[-Xmx|G|M]", "")))) {
+			if(!((ForgeUtils.getServerRAMAlloc(serverDir.toPath())+"").replaceAll("[-Xmx|G|M]", "").equals(serverRamAllocInput.getText().replaceAll("[-Xmx|G|M]", "")))) {
 				Pattern pattern = Pattern.compile("^[0-9]*$");
 				Matcher matcher = pattern.matcher(serverRamAllocInput.getText().replaceAll("[-Xmx|G|M]", ""));
 				if(matcher.find()) {
 					try {
-						ForgeUtils.setServerRAMAlloc(serverOpenedDirectory.toPath(), Integer.parseInt(serverRamAllocInput.getText().replaceAll("[-Xmx|G|M]", "")));
+						ForgeUtils.setServerRAMAlloc(serverDir.toPath(), Integer.parseInt(serverRamAllocInput.getText().replaceAll("[-Xmx|G|M]", "")));
 					}
 					catch(Exception ramExpection) {
 						if(ramExpection.getMessage().equalsIgnoreCase("Ram exceeded"))
@@ -933,7 +735,40 @@ public class MainFrame {
 			configDialog.dispose();
 		});
 	}
-	
+
+	void createRepoForTab(ServerTab tab, JPanel fatherPanel) {
+		fatherPanel.setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
+		File serverDir = tab.getServerDirectory();
+		boolean localRepoCreated = GitUtils.createRepoIfNotExistsInPath(serverDir.toPath());
+		if(localRepoCreated) {
+			String token;
+			try {token = TokenStore.loadToken();}
+			catch(Exception e) {JOptionPane.showMessageDialog(null, "The GitHub token is not correct, invalid or nonexistent, consider sign in again", "Error", JOptionPane.ERROR_MESSAGE); return;}
+
+			String json = GitUtils.createRepoInGitHub(token, tab.getServerName());
+			Map<String, String> responseMap = GitUtils.convertJsonStringToMap(json);
+			boolean repoCreatedCorrectly = GitUtils.linkLocalRepoToExternal(responseMap.get("clone_url"), token, serverDir.toPath());
+
+			GitUtils.setSkipWorktree(serverDir.toPath(), Path.of(serverDir.toString() + "/server.properties"), true);
+			GitUtils.setSkipWorktree(serverDir.toPath(), Path.of(serverDir.toString() + "/user_jvm_args.txt"), true);
+
+			if(repoCreatedCorrectly) {
+				fatherPanel.setCursor(Cursor.getDefaultCursor());
+		        JOptionPane.showMessageDialog(
+		                frame,
+		                "Repo created and linked successfully!",
+		                "Git",
+		                JOptionPane.INFORMATION_MESSAGE
+		        );
+		        return;
+			}
+			else {
+				JOptionPane.showMessageDialog(null, "Something went wrong, try again.", "Error", JOptionPane.ERROR_MESSAGE);
+			}
+		}
+		fatherPanel.setCursor(Cursor.getDefaultCursor());
+	}
+
 	public static void checkIfExistsDataFolder() {
 		if(!(Files.exists(Paths.get("data")))) {
 			try {
@@ -944,7 +779,57 @@ public class MainFrame {
 			}
 		}
 	}
-	
+
+	private File getLastOpenedServer() {
+		if(!(Files.exists(Paths.get("data/recentServers.properties")))) {
+			try {
+				Files.createFile(Paths.get("data/recentServers.properties"));
+			} catch (IOException e) {}
+			return null;
+		}
+		Properties props = new Properties();
+		File file = new File("data/recentServers.properties");
+		try(FileInputStream in = new FileInputStream(file)) {
+			props.load(in);
+			if(props.containsKey("recentServers")) {
+				String first = props.getProperty("recentServers").split("\\|")[0];
+				File dir = new File(first);
+				if (dir.isDirectory()) return dir;
+			}
+		} catch (IOException e) {}
+		return null;
+	}
+
+	private void saveToRecentServers(File serverDir) {
+		Properties props = new Properties();
+		if(!(Files.exists(Paths.get("data/recentServers.properties")))) {
+			try {
+				Files.createFile(Paths.get("data/recentServers.properties"));
+			} catch (IOException e) {
+				JOptionPane.showMessageDialog(null, "File not found or inaccessible", "Error", JOptionPane.ERROR_MESSAGE);
+			}
+		}
+		File file = new File("data/recentServers.properties");
+		try(FileInputStream in = new FileInputStream(file)){
+			props.load(in);
+			String path = serverDir.toPath().toString().replaceAll("\\\\", "/");
+			String recentServers = "";
+			if(props.containsKey("recentServers"))
+				if(!(props.get("recentServers").toString().contains(path)))
+					recentServers = path + "|" + props.getProperty("recentServers");
+				else
+					recentServers = path + "|" + props.getProperty("recentServers").replaceAll(path, "").replace("||", "|").replaceAll("[|\\n]", "");
+			else recentServers = path;
+			props.setProperty("recentServers", recentServers);
+		    FileOutputStream out = new FileOutputStream(file);
+	        props.store(out, "Updated recent servers");
+	        out.close();
+		}
+		catch(IOException e) {
+			JOptionPane.showMessageDialog(null, "File not found or inaccessible", "Error", JOptionPane.ERROR_MESSAGE);
+		}
+	}
+
 	private void recentServerListGenerator() {
 		recentServersMenu.removeAll();
 		File file = new File("data/recentServers.properties");
@@ -955,37 +840,27 @@ public class MainFrame {
 				for(String serverDirectory : props.getProperty("recentServers").split("\\|")) {
 					JMenuItem item = new JMenuItem(serverDirectory);
 					item.addActionListener(itm -> {
-						serverOpenedDirectory = new File(serverDirectory);
-						SwingUtilities.invokeLater(() -> {
-							createServerBackupsFolderInCloud.removeActionListener(crbckfldcld);
-							openServerOptions(contentPane);
-						});
+						openServerInNewTab(new File(serverDirectory));
 					});
 					recentServersMenu.add(item);
 				}
 			}
-			else { 
+			else {
 				recentServersMenu.add(new JMenuItem("No recent files opened..."));
 				return;
 			}
 		} catch (IOException e) {
-			e.printStackTrace();
-			JOptionPane.showMessageDialog(null, "File not found or inaccessible", "Error", JOptionPane.ERROR_MESSAGE);
+			recentServersMenu.add(new JMenuItem("No recent files opened..."));
 		}
 		recentServersMenu.revalidate();
 		recentServersMenu.repaint();
 	}
-	
-	public static String getServerName() {
-	   return serverOpenedDirectory.toString().substring(serverOpenedDirectory.toString().lastIndexOf("\\") + 1, serverOpenedDirectory.toString().length());
-	}
-	
+
 	private void radioBtnListener(JMenu cloudMenu, JMenu saveBackupsToCloudMenu, JRadioButtonMenuItem radioButton) {
 	    SwingUtilities.invokeLater(() -> {
 	    	cloudProviderInUse = radioButton.getText().replaceAll(" ", "");
-	    	System.out.println(cloudProviderInUse);
 	    	if(!cloudProviderInUse.equals("GitHub")) {
-	    		if(cloudProvider == null || !cloudProvider.isSessionOpened()) 
+	    		if(cloudProvider == null || !cloudProvider.isSessionOpened())
 	    			cloudInUseReminderMenuText.setText(cloudInUseReminderText[0].formatted(cloudInUseReminderText[3].formatted(cloudProviderInUse)));
 	    		else
 	    			cloudInUseReminderMenuText.setText(cloudInUseReminderText[0].formatted(cloudInUseReminderText[1] + cloudProviderInUse));
@@ -999,43 +874,52 @@ public class MainFrame {
 			ZipUtils.createOrModiFyPropertiesFile("cloudProviderInUse", cloudProviderInUse, CLOUD_PROVIDER_IN_USE_PATH);
 			cloudMenu.doClick();
 			saveBackupsToCloudMenu.doClick();
-			new Thread(() -> {
-				contentPane.setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
-				openServerOptions(contentPane);
-				contentPane.setCursor(Cursor.getDefaultCursor());
-			}).start();
 	    });
 	}
-	
-	public void turnOffServer() {
-		frame.setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
-		ForgeUtils.sendCommand("/stop", serverProcess, serverWriter);
-		new Thread(() ->{
-			try {serverProcess.waitFor();} catch (InterruptedException e) {}
-			if(TokenStore.sessionIsOpened() && GitUtils.repoExistInPath(serverOpenedDirectory.toPath())  && cloudProviderInUse != null && cloudProviderInUse == "GitHub") GitUtils.autoCommitAndPush(true);
-			if(cloudProvider != null && cloudProvider.getProviderName().equals(cloudProviderInUse) && cloudProvider.isSessionOpened()) {
-				if(cloudProvider.hasRemoteServerFolder()) {
-					ZipUtils.createZip(serverOpenedDirectory.toPath(), ZipUtils.BACKUPS_ZIPS_FOLDER);
-					cloudProvider.uploadServerBackup(ZipUtils.BACKUPS_ZIPS_FOLDER);
-				}
-			}
-			
-			consoleThread.interrupt();
-			serverProcess = null;
-			
-			SwingUtilities.invokeLater(() -> {
-				consoleContent.removeAll();
-				consoleArea = null;
-				comandInput = null;
-				serverWriter = null;
-				serverIsOn = false;
-				turnOnOffBtn.setText("On");
-				responder.closeListeningSocket();
-				checkServerStatus();
-			});
-			frame.setCursor(Cursor.getDefaultCursor());
-			
-		}).start();
+
+	public JFrame getFrame() {
+		return frame;
 	}
 
+	// Static convenience methods for backward compatibility with code that references MainFrame statics
+	public static Process getServerProcess() {
+		if (window == null) return null;
+		ServerTab tab = window.getActiveServerTab();
+		return tab != null ? tab.getServerProcess() : null;
+	}
+
+	public static java.io.BufferedWriter getServerWriter() {
+		if (window == null) return null;
+		ServerTab tab = window.getActiveServerTab();
+		return tab != null ? tab.getServerWriter() : null;
+	}
+
+	public static boolean isServerOn() {
+		if (window == null) return false;
+		ServerTab tab = window.getActiveServerTab();
+		return tab != null && tab.isServerOn();
+	}
+
+	public static File getServerOpenedDirectory() {
+		if (window == null) return null;
+		ServerTab tab = window.getActiveServerTab();
+		return tab != null ? tab.getServerDirectory() : null;
+	}
+
+	public static String getServerName() {
+		if (window == null) return "";
+		ServerTab tab = window.getActiveServerTab();
+		return tab != null ? tab.getServerName() : "";
+	}
+
+	public static int getActualServerPort() {
+		if (window == null) return 0;
+		ServerTab tab = window.getActiveServerTab();
+		return tab != null ? tab.getServerPort() : 0;
+	}
+
+	public void turnOffServer() {
+		ServerTab tab = getActiveServerTab();
+		if (tab != null) tab.turnOffServer();
+	}
 }
